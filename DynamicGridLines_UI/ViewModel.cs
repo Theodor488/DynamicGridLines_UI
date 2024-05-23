@@ -1,10 +1,14 @@
-﻿
+﻿using LiveCharts;
+using LiveCharts.Defaults;
+using LiveCharts.Wpf;
 using LiveChartsCore;
 using LiveChartsCore.ConditionalDraw;
 using LiveChartsCore.Measure;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
 using SkiaSharp;
+using System.Collections.Generic;
+using System.Windows.Media;
 
 namespace DynamicGridLines_UI;
 
@@ -12,35 +16,41 @@ public partial class ViewModel
 {
     public ViewModel()
     {
-        var paints = new SolidColorPaint[]
-        {
-            new(SKColors.Red),
-            new(SKColors.Green),
-            new(SKColors.Blue),
-            new(SKColors.Yellow)
-        };
+        DrawChart drawChart = new DrawChart();
+        DynamicSizing dynamicSizing = new DynamicSizing();
 
-        var series = new ColumnSeries<int>
+        double chartWidth = 100;
+        double chartHeight = 100;
+        int numOfGridPoints = 8;
+        int minNeighborDistance = 25;
+
+        List<GridPoint> gridLinePositions = drawChart.Draw(chartWidth, chartHeight, numOfGridPoints);
+
+        SeriesCollection = new SeriesCollection();
+
+        foreach (GridPoint gridPoint in gridLinePositions)
         {
-            Values = new[] { 2, 5, 4, 6, 8, 3, 2, 4, 6 },
-            DataLabelsPaint = new SolidColorPaint(new SKColor(30, 30, 30)),
-            DataLabelsPosition = DataLabelsPosition.Top
+            dynamicSizing.GetNeighborsWithinMaxDistance(gridLinePositions, gridPoint, minNeighborDistance);
+
+            var scatterPoint = new ScatterPoint(gridPoint.xAxis, gridPoint.yAxis);
+
+            var series = new ScatterSeries
+            {
+                Title = $"({gridPoint.xAxis}, {gridPoint.yAxis}). DistanceToNearestNeighbor = {gridPoint.DistanceToNearestNeighbor}",
+                DataLabels = true,
+                LabelPoint = point => $"({point.X}, {point.Y})",
+                Values = new ChartValues<ScatterPoint> { scatterPoint },
+                MinPointShapeDiameter = 10,
+                MaxPointShapeDiameter = 10,
+                PointGeometry = DefaultGeometries.Circle,
+                Fill = gridPoint.ShowLabel ? Brushes.Green : Brushes.Red
+            };
+
+            SeriesCollection.Add(series);
         }
-        .OnPointMeasured(point =>
-        {
-            // this method is called for each point in the series
-            // we can customize the visual here
-
-            if (point.Visual is null) return;
-
-            // get a paint from the array
-            var paint = paints[point.Index % paints.Length];
-            // set the paint to the visual
-            point.Visual.Fill = paint;
-        });
-
-        Series = new ISeries[] { series };
     }
 
     public ISeries[] Series { get; set; }
+
+    public SeriesCollection SeriesCollection { get; set; }
 }
